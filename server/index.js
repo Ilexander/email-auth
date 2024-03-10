@@ -1,11 +1,17 @@
 const express = require('express');
 const { createMqChannel } = require('./mq/scripts');
+const { v4: uuidv4 } = require('uuid');
+const cors = require('cors')
 
 const app = express();
 const port = 3000;
 
-// Middleware для обработки JSON
 app.use(express.json());
+app.use(cors())
+
+const secret = {
+    key: null
+}
 
 const sendToTechical = async (message) => {
     const queue = 'technical'
@@ -18,14 +24,17 @@ const sendToTechical = async (message) => {
     }, 1000);
 }
 
-app.post('/send-message', async (req, res) => {
+app.post('/send-code', async (req, res) => {
     try {
-        const { to, subject, text } = req.body;
+        const { to, } = req.body;
+        secret.key = uuidv4();
+        const secretKey = secret.key
+        const text = `Your secret key: ${secretKey}`
 
         const mailOptions = {
             from: process.env.MAIL_FROM,
             to,
-            subject,
+            subject: 'Inc.',
             text,
         };
 
@@ -33,11 +42,24 @@ app.post('/send-message', async (req, res) => {
         sendToTechical(JSON.stringify(mailOptions)) // Mq must send message "Email sent" when message was sended
         console.log(`Continue email sending`);
 
-        return res.status(200).json({ status: 'Message sent successfully' });
+        return res.status(200).json({ message: 'Code has sent to your e-mail' });
     } catch (error) {
         return res.status(500).json(error.message);
     }
 });
+
+app.post('/code-confirm', async (req, res) => {
+    try {
+        const { code } = req.body
+        const secretKey = secret.key
+
+        if (!code || code !== secretKey) throw new Error('Code is not match!')
+
+        return res.status(200).send({ message: 'Code has confirmed!' })
+    } catch (error) {
+        return res.status(500).json(error.message);
+    }
+})
 
 app.listen(port, async () => {
     console.log(`Server is running at http://localhost:${port}`);
